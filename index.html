@@ -3,75 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Relay Control</title>
+    <title>Premium Relay Control</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: white; text-align: center; padding: 20px; }
-        .container { max-width: 600px; margin: auto; }
-        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
-        .card { background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn-on { background: #10b981; color: white; margin-bottom: 5px; }
-        .btn-off { background: #ef4444; color: white; }
-        .btn-all-on { background: #3b82f6; margin-top: 20px; padding: 15px; font-size: 1.1rem; }
-        .btn-all-off { background: #64748b; margin-top: 10px; padding: 15px; font-size: 1.1rem; }
-        .status { margin-top: 10px; font-size: 0.8rem; color: #94a3b8; }
+        :root {
+            --primary: #00d2ff;
+            --success: #00ff88;
+            --danger: #ff4b2b;
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            background: var(--bg); 
+            color: white; 
+            margin: 0; 
+            display: flex; 
+            justify-content: center; 
+            padding: 20px;
+        }
+
+        .container { width: 100%; max-width: 500px; }
+
+        /* Dashboard Stat */
+        .dashboard {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .stat-label { font-size: 0.8rem; opacity: 0.7; }
+
+        /* Relay Grid */
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 15px; 
+        }
+
+        .relay-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+            transition: 0.3s;
+        }
+
+        .relay-card.active { border-color: var(--success); box-shadow: 0 0 15px rgba(0,255,136,0.2); }
+
+        .btn-toggle {
+            width: 80px;
+            height: 40px;
+            background: #334155;
+            border-radius: 20px;
+            position: relative;
+            cursor: pointer;
+            margin: 15px auto 0;
+            transition: 0.3s;
+        }
+
+        .btn-toggle::before {
+            content: '';
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 50%;
+            top: 4px;
+            left: 4px;
+            transition: 0.3s;
+        }
+
+        .active .btn-toggle { background: var(--success); }
+        .active .btn-toggle::before { left: 44px; }
+
+        /* Master Buttons */
+        .master-controls { margin-top: 25px; display: flex; gap: 10px; }
+        .m-btn { 
+            flex: 1; padding: 15px; border: none; border-radius: 12px; 
+            color: white; font-weight: bold; cursor: pointer; opacity: 0.9;
+        }
+        .m-btn:hover { opacity: 1; }
+        .on { background: linear-gradient(45deg, #00d2ff, #3a7bd5); }
+        .off { background: #475569; }
+
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Smart Relay Cloud Control</h2>
-    <p>Token: <span id="token-display" style="color: #3b82f6;">กำลังโหลด...</span></p>
+    <h2 style="text-align: left; margin-bottom: 5px;">Smart Control</h2>
+    <p style="text-align: left; opacity: 0.6; margin-bottom: 25px;">จัดการอุปกรณ์ของคุณผ่านระบบคลาวด์</p>
 
-    <div class="grid" id="controls">
-        <!-- สร้างปุ่ม 8 ช่อง -->
+    <div class="dashboard">
+        <div class="stat-card">
+            <div class="stat-value" id="on-count">0</div>
+            <div class="stat-label">เปิดอยู่ (หลอด)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="runtime">00:00</div>
+            <div class="stat-label">ใช้งานนานเท่าไหร่</div>
+        </div>
     </div>
 
-    <button class="btn-all-on" onclick="masterControl('V8', 1)">เปิดทั้งหมด (All ON)</button>
-    <button class="btn-all-off" onclick="masterControl('V9', 1)">ปิดทั้งหมด (All OFF)</button>
-    
-    <div id="log" class="status">สถานะ: พร้อมใช้งาน</div>
+    <div class="grid" id="relay-grid"></div>
+
+    <div class="master-controls">
+        <button class="m-btn on" onclick="masterAction(1)">เปิดทั้งหมด</button>
+        <button class="m-btn off" onclick="masterAction(0)">ปิดทั้งหมด</button>
+    </div>
 </div>
 
 <script>
-    // *** แก้ไข Token ของคุณที่นี่ ***
-    const BLYNK_AUTH_TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
-    const BLYNK_API_URL = "https://sgp1.blynk.cloud/external/api/update?token=" + BLYNK_AUTH_TOKEN;
+    const BLYNK_TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
+    const API_URL = "https://sgp1.blynk.cloud/external/api/update?token=" + BLYNK_TOKEN;
+    
+    let relayStates = new Array(8).fill(false);
+    let startTime = Date.now();
 
-    document.getElementById('token-display').innerText = BLYNK_AUTH_TOKEN.substring(0, 8) + "********";
-
-    // สร้างปุ่มควบคุม 1-8
-    const controls = document.getElementById('controls');
-    for (let i = 0; i < 8; i++) {
-        controls.innerHTML += `
-            <div class="card">
-                <div style="margin-bottom:10px">Relay ${i+1}</div>
-                <button class="btn-on" onclick="sendCMD('V${i}', 1)">ON</button>
-                <button class="btn-off" onclick="sendCMD('V${i}', 0)">OFF</button>
+    // สร้าง UI
+    const grid = document.getElementById('relay-grid');
+    for(let i=0; i<8; i++) {
+        grid.innerHTML += `
+            <div class="relay-card" id="card-${i}">
+                <div style="font-weight:bold">ช่องที่ ${i+1}</div>
+                <div class="btn-toggle" onclick="toggle(${i})"></div>
             </div>
         `;
     }
 
-    async function sendCMD(pin, value) {
-        const url = `${BLYNK_API_URL}&${pin}=${value}`;
-        updateLog(`กำลังส่งคำสั่งไปที่ ${pin}...`);
-        try {
-            await fetch(url);
-            updateLog(`สำเร็จ: ${pin} เป็น ${value == 1 ? 'ON' : 'OFF'}`);
-        } catch (err) {
-            updateLog("เกิดข้อผิดพลาดในการเชื่อมต่อ!");
-        }
+    async function toggle(id) {
+        relayStates[id] = !relayStates[id];
+        const val = relayStates[id] ? 1 : 0;
+        updateUI();
+        await fetch(`${API_URL}&V${id}=${val}`);
     }
 
-    async function masterControl(pin, value) {
-        await sendCMD(pin, value);
-        updateLog(`ส่งคำสั่ง Master (${pin}) สำเร็จ`);
+    async function masterAction(val) {
+        relayStates.fill(val === 1);
+        updateUI();
+        const pin = val === 1 ? 'V8' : 'V9';
+        await fetch(`${API_URL}&${pin}=1`);
     }
 
-    function updateLog(msg) {
-        document.getElementById('log').innerText = "สถานะ: " + msg;
+    function updateUI() {
+        let count = 0;
+        relayStates.forEach((state, i) => {
+            const card = document.getElementById(`card-${i}`);
+            if(state) {
+                card.classList.add('active');
+                count++;
+            } else {
+                card.classList.remove('active');
+            }
+        });
+        document.getElementById('on-count').innerText = count;
     }
+
+    // Timer Function
+    setInterval(() => {
+        const diff = Math.floor((Date.now() - startTime) / 1000);
+        const m = Math.floor(diff / 60).toString().padStart(2, '0');
+        const s = (diff % 60).toString().padStart(2, '0');
+        document.getElementById('runtime').innerText = `${m}:${s}`;
+    }, 1000);
+
 </script>
-
 </body>
 </html>
