@@ -3,19 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - v2.0 (No-Refresh)</title>
+    <title>Home_8ch - v2.1 (Auto Sync)</title>
     <style>
         :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; }
         body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
         
-        .header-controls { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 30px; }
+        .header-controls { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 25px; }
         .server-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; background: #222; }
         .dot { width: 10px; height: 10px; border-radius: 50%; }
         .online { background: var(--bright-green); box-shadow: 0 0 10px var(--bright-green); }
         .offline { background: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
 
+        /* ส่วนตั้งค่า Auto Sync */
+        .sync-panel { font-size: 0.85rem; color: #888; background: #1a1a1a; padding: 10px 20px; border-radius: 12px; border: 1px solid #333; display: flex; gap: 10px; align-items: center; }
+        .sync-panel input { width: 50px; background: #222; border: 1px solid #444; color: var(--bright-green); text-align: center; border-radius: 6px; padding: 4px; font-weight: bold; }
+
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
-        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; user-select: none; }
+        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; }
         .card.active { border-color: var(--bright-green); box-shadow: 0 0 15px rgba(38, 255, 0, 0.2); }
         
         .btn-toggle { width: 60px; height: 30px; background: #333; border-radius: 20px; position: relative; margin: 15px auto 0; pointer-events: none; }
@@ -24,7 +28,7 @@
         .active .btn-toggle::before { left: 34px; }
 
         .master-controls { display: flex; gap: 10px; max-width: 800px; margin: 30px auto; }
-        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         .btn-on { background: var(--bright-green); color: #000; }
         .btn-off { background: #444; color: #fff; }
         .version { font-size: 0.7rem; color: #444; margin-top: 20px; }
@@ -37,7 +41,12 @@
     <div class="header-controls">
         <div class="server-status">
             <div id="status-dot" class="dot offline"></div>
-            <span id="status-text" style="font-size: 0.8rem;">กำลังตรวจสอบบอร์ด...</span>
+            <span id="status-text" style="font-size: 0.8rem;">กำลังซิงค์...</span>
+        </div>
+
+        <div class="sync-panel">
+            <span>ซิงค์อัตโนมัติทุก (วินาที):</span>
+            <input type="number" id="sync-interval-input" value="3" min="1" max="60" onchange="startAutoSync()">
         </div>
     </div>
 
@@ -48,15 +57,16 @@
         <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด</button>
     </div>
 
-    <div class="version">v2.0 | Pure Control - No Refresh</div>
+    <div class="version">v2.1 | Auto Background Sync (No Reload)</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
     const API_BASE = "https://sgp1.blynk.cloud/external/api/";
 
     let relayStates = new Array(8).fill(false);
+    let syncTimer = null; // ตัวแปรสำหรับเก็บรอบการซิงค์
 
-    // 1. สร้าง Interface
+    // สร้าง Interface
     const grid = document.getElementById('main-grid');
     grid.innerHTML = relayStates.map((_, i) => `
         <div class="card" id="card-${i}" onclick="toggle(${i})">
@@ -65,7 +75,7 @@
         </div>
     `).join('');
 
-    // 2. ฟังก์ชันตรวจสอบสถานะ Online (ทำเบื้องหลังทุก 15 วิ)
+    // เช็คสถานะบอร์ด Online/Offline
     async function checkServer() {
         try {
             const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
@@ -75,34 +85,44 @@
         } catch (e) { console.error("Server Check Error"); }
     }
 
-    // 3. ซิงค์สถานะเริ่มต้นจาก Blynk (ทำครั้งเดียวเมื่อเปิดหน้าเว็บ)
+    // ดึงข้อมูลสถานะจริงจาก Blynk โดยไม่รีเฟรชหน้า
     async function syncStatus() {
         try {
             const promises = relayStates.map((_, i) => fetch(`${API_BASE}get?token=${TOKEN}&V${i}`).then(r => r.text()));
             const results = await Promise.all(promises);
             relayStates = results.map(val => val.trim() === "1");
             updateUI();
-        } catch (err) { console.error("Initial Sync Failed"); }
+        } catch (err) { console.error("Sync Failed"); }
     }
 
-    // 4. สั่งงานรายตัว (เปลี่ยน UI ทันที ไม่รีเฟรช)
+    // ฟังก์ชันเริ่มระบบ Auto Sync ตามเวลาที่ตั้งค่า
+    function startAutoSync() {
+        const intervalInput = document.getElementById('sync-interval-input');
+        const seconds = parseInt(intervalInput.value) || 3;
+
+        // ล้างรอบเก่าก่อนเริ่มรอบใหม่
+        if (syncTimer) clearInterval(syncTimer);
+
+        // ตั้งรอบการซิงค์ใหม่ (วินาที * 1000 = มิลลิวินาที)
+        syncTimer = setInterval(() => {
+            syncStatus();
+            checkServer();
+        }, seconds * 1000);
+        
+        console.log(`Auto Sync started every ${seconds}s`);
+    }
+
     function toggle(id) {
         relayStates[id] = !relayStates[id];
         updateUI();
-        
-        const val = relayStates[id] ? 1 : 0;
-        fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`)
-            .catch(err => console.error("Update failed", err));
+        fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${relayStates[id] ? 1 : 0}`);
     }
 
-    // 5. สั่งงานกลุ่ม (เปลี่ยน UI ทันที ไม่รีเฟรช)
     function masterAction(val) {
         relayStates.fill(val === 1);
         updateUI();
-        
         const vPin = val === 1 ? 'V8' : 'V9';
-        fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`)
-            .catch(err => console.error("Master action failed", err));
+        fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
     }
 
     function updateUI() {
@@ -112,11 +132,10 @@
         });
     }
 
-    // เริ่มการทำงาน
     window.onload = () => {
         syncStatus();
         checkServer();
-        setInterval(checkServer, 15000); // อัปเดตสถานะบอร์ดทุก 15 วินาทีเงียบๆ
+        startAutoSync(); // เริ่มระบบ Auto Sync ทันทีที่เปิดหน้าเว็บ
     };
 </script>
 </body>
