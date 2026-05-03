@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - v1.4 (Auto Refresh)</title>
+    <title>Home_8ch - v1.5 (Smart Refresh)</title>
     <style>
         :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; }
         body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
@@ -22,6 +22,7 @@
         .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; }
         .btn-on { background: var(--bright-green); color: #000; }
         .btn-off { background: #444; color: #fff; }
+        #refresh-notice { color: var(--bright-green); font-size: 0.8rem; margin-top: 10px; height: 20px; font-weight: bold; }
         .version { font-size: 0.7rem; color: #444; margin-top: 20px; }
     </style>
 </head>
@@ -31,8 +32,10 @@
     
     <div class="server-status">
         <div id="status-dot" class="dot offline"></div>
-        <span id="status-text" style="font-size: 0.8rem;">กำลังซิงค์...</span>
+        <span id="status-text" style="font-size: 0.8rem;">กำลังตรวจสอบสถานะ...</span>
     </div>
+
+    <div id="refresh-notice"></div>
 
     <div class="grid" id="main-grid"></div>
 
@@ -41,7 +44,7 @@
         <button class="m-btn btn-off" onclick="masterAction(0)">ALL OFF</button>
     </div>
 
-    <div class="version">v1.4 | ระบบรีเฟรชหน้าเว็บอัตโนมัติเมื่อมีการสั่งงาน</div>
+    <div class="version">v1.5 | ระบบรีเฟรชอัตโนมัติใน 5 วินาทีหลังสั่งงาน</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
@@ -49,25 +52,28 @@
 
     let relayStates = new Array(8).fill(false);
 
+    // สร้างปุ่ม Relay 8 ช่อง
     const grid = document.getElementById('main-grid');
     for(let i=0; i<8; i++) {
         grid.innerHTML += `
             <div class="card" id="card-${i}">
-                <span>Relay ${i+1}</span>
-                <div class="btn-toggle" onclick="toggle(${i})"></div>
+                <span>ช่องที่ ${i+1}</span>
+                <div class="btn-toggle" onclick="handleUpdate(${i})"></div>
             </div>
         `;
     }
 
+    // ตรวจสอบว่าบอร์ดเชื่อมต่ออยู่หรือไม่
     async function checkServer() {
         try {
             const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
             const isOnline = await res.json();
             document.getElementById('status-dot').className = isOnline ? "dot online" : "dot offline";
             document.getElementById('status-text').innerText = isOnline ? "BOARD ONLINE" : "BOARD OFFLINE";
-        } catch (e) { console.error("Server Check Error"); }
+        } catch (e) { console.error("Check Connection Failed"); }
     }
 
+    // ดึงสถานะไฟปัจจุบันจาก Cloud
     async function syncStatus() {
         try {
             for(let i=0; i<8; i++) {
@@ -78,30 +84,35 @@
                 }
             }
             updateUI();
-        } catch (err) { console.error("Sync Error"); }
+        } catch (err) { console.error("Sync Failed"); }
     }
 
-    // --- ส่วนที่ปรับปรุง: เพิ่มการรีเฟรช ---
-    async function toggle(id) {
-        const val = relayStates[id] ? 0 : 1; // สลับสถานะ
-        
-        // ส่งคำสั่งไปยัง Cloud และรอให้เสร็จสิ้น
+    // ฟังก์ชันสั่งรีเฟรชพร้อมตัวนับ
+    function triggerRefresh() {
+        let count = 5;
+        const notice = document.getElementById('refresh-notice');
+        const timer = setInterval(() => {
+            notice.innerText = `กำลังบันทึกข้อมูล... รีเฟรชใน ${count} วินาที`;
+            count--;
+            if (count < 0) {
+                clearInterval(timer);
+                window.location.reload();
+            }
+        }, 1000);
+    }
+
+    // สั่งงานรายตัว
+    async function handleUpdate(id) {
+        const val = relayStates[id] ? 0 : 1;
         await fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
-        
-        // บังคับรีเฟรชหน้าเว็บทันทีหลังจากคำสั่งส่งเสร็จ
-        window.location.reload();
+        triggerRefresh();
     }
 
+    // สั่งงาน Master
     async function masterAction(val) {
         const vPin = val === 1 ? 'V8' : 'V9';
-        
         await fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
-        
-        // บังคับรีเฟรชหน้าเว็บหลังจากสั่ง All ON/OFF
-        // หน่วงเวลาเล็กน้อย 500ms เพื่อให้ Cloud ประมวลผลทันก่อนโหลดใหม่
-        setTimeout(() => {
-            window.location.reload();
-        }, 500);
+        triggerRefresh();
     }
 
     function updateUI() {
@@ -115,6 +126,7 @@
     window.onload = () => {
         syncStatus();
         checkServer();
+        // ตรวจสอบสถานะ Server ทุก 10 วินาทีโดยไม่รีเฟรชหน้า
         setInterval(checkServer, 10000);
     };
 </script>
