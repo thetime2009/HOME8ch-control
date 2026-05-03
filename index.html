@@ -3,26 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - v1.5 (Smart Refresh)</title>
+    <title>Home_8ch - v1.6 (Instant & Sync)</title>
     <style>
         :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; }
         body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
-        .server-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; background: #222; margin-bottom: 20px; }
+        .server-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; background: #222; margin-bottom: 10px; }
         .dot { width: 10px; height: 10px; border-radius: 50%; }
         .online { background: var(--bright-green); box-shadow: 0 0 10px var(--bright-green); }
         .offline { background: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
+        
+        /* แจ้งเตือนการรีเฟรช */
+        #refresh-banner { height: 25px; color: var(--bright-green); font-size: 0.8rem; margin-bottom: 10px; transition: 0.3s; opacity: 0; }
+        
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
-        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; }
+        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; }
         .card.active { border-color: var(--bright-green); box-shadow: 0 0 15px rgba(38, 255, 0, 0.2); }
-        .btn-toggle { width: 60px; height: 30px; background: #333; border-radius: 20px; position: relative; cursor: pointer; margin: 15px auto 0; }
+        
+        .btn-toggle { width: 60px; height: 30px; background: #333; border-radius: 20px; position: relative; margin: 15px auto 0; pointer-events: none; }
         .btn-toggle::before { content: ''; position: absolute; width: 22px; height: 22px; background: #fff; border-radius: 50%; top: 4px; left: 4px; transition: 0.3s; }
         .active .btn-toggle { background: var(--bright-green); }
         .active .btn-toggle::before { left: 34px; }
+
         .master-controls { display: flex; gap: 10px; max-width: 800px; margin: 30px auto; }
-        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; }
+        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         .btn-on { background: var(--bright-green); color: #000; }
         .btn-off { background: #444; color: #fff; }
-        #refresh-notice { color: var(--bright-green); font-size: 0.8rem; margin-top: 10px; height: 20px; font-weight: bold; }
         .version { font-size: 0.7rem; color: #444; margin-top: 20px; }
     </style>
 </head>
@@ -32,19 +37,19 @@
     
     <div class="server-status">
         <div id="status-dot" class="dot offline"></div>
-        <span id="status-text" style="font-size: 0.8rem;">กำลังตรวจสอบสถานะ...</span>
+        <span id="status-text" style="font-size: 0.8rem;">กำลังโหลด...</span>
     </div>
 
-    <div id="refresh-notice"></div>
+    <div id="refresh-banner">สถานะอัปเดตแล้ว... กำลังซิงค์ข้อมูลใน 5 วิ</div>
 
     <div class="grid" id="main-grid"></div>
 
     <div class="master-controls">
-        <button class="m-btn btn-on" onclick="masterAction(1)">ALL ON</button>
-        <button class="m-btn btn-off" onclick="masterAction(0)">ALL OFF</button>
+        <button class="m-btn btn-on" onclick="masterAction(1)">เปิดทั้งหมด</button>
+        <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด</button>
     </div>
 
-    <div class="version">v1.5 | ระบบรีเฟรชอัตโนมัติใน 5 วินาทีหลังสั่งงาน</div>
+    <div class="version">v1.6 | Instant UI + 5s Auto-Refresh Sync</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
@@ -52,28 +57,28 @@
 
     let relayStates = new Array(8).fill(false);
 
-    // สร้างปุ่ม Relay 8 ช่อง
+    // 1. สร้าง Interface
     const grid = document.getElementById('main-grid');
     for(let i=0; i<8; i++) {
         grid.innerHTML += `
-            <div class="card" id="card-${i}">
+            <div class="card" id="card-${i}" onclick="toggle(${i})">
                 <span>ช่องที่ ${i+1}</span>
-                <div class="btn-toggle" onclick="handleUpdate(${i})"></div>
+                <div class="btn-toggle"></div>
             </div>
         `;
     }
 
-    // ตรวจสอบว่าบอร์ดเชื่อมต่ออยู่หรือไม่
+    // 2. ฟังก์ชันตรวจสอบสถานะบอร์ด
     async function checkServer() {
         try {
             const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
             const isOnline = await res.json();
             document.getElementById('status-dot').className = isOnline ? "dot online" : "dot offline";
             document.getElementById('status-text').innerText = isOnline ? "BOARD ONLINE" : "BOARD OFFLINE";
-        } catch (e) { console.error("Check Connection Failed"); }
+        } catch (e) { console.error("Server Check Error"); }
     }
 
-    // ดึงสถานะไฟปัจจุบันจาก Cloud
+    // 3. ฟังก์ชันซิงค์ข้อมูลเริ่มต้น
     async function syncStatus() {
         try {
             for(let i=0; i<8; i++) {
@@ -84,35 +89,47 @@
                 }
             }
             updateUI();
-        } catch (err) { console.error("Sync Failed"); }
+        } catch (err) { console.error("Initial Sync Failed"); }
     }
 
-    // ฟังก์ชันสั่งรีเฟรชพร้อมตัวนับ
-    function triggerRefresh() {
-        let count = 5;
-        const notice = document.getElementById('refresh-notice');
-        const timer = setInterval(() => {
-            notice.innerText = `กำลังบันทึกข้อมูล... รีเฟรชใน ${count} วินาที`;
-            count--;
-            if (count < 0) {
-                clearInterval(timer);
+    // 4. ฟังก์ชันจัดการเมื่อมีการกดปุ่ม (ไฮไลท์: เปลี่ยนทันที + หน่วงเวลาซิงค์)
+    async function toggle(id) {
+        // --- ส่วนที่ 1: สถานะเปลี่ยนทันที (Instant Update) ---
+        relayStates[id] = !relayStates[id]; 
+        updateUI(); 
+
+        // --- ส่วนที่ 2: ส่งคำสั่งไปยัง Blynk ---
+        const val = relayStates[id] ? 1 : 0;
+        fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
+
+        // --- ส่วนที่ 3: รอ 5 วิ เพื่อรีเฟรชยืนยันค่าจริง ---
+        startRefreshTimer();
+    }
+
+    async function masterAction(val) {
+        // เปลี่ยนหน้าเว็บทันทีทุกดวง
+        relayStates.fill(val === 1);
+        updateUI();
+
+        const vPin = val === 1 ? 'V8' : 'V9';
+        fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
+
+        startRefreshTimer();
+    }
+
+    function startRefreshTimer() {
+        const banner = document.getElementById('refresh-banner');
+        banner.style.opacity = "1";
+        
+        let timeLeft = 5;
+        const countdown = setInterval(() => {
+            banner.innerText = `ส่งคำสั่งแล้ว! ระบบจะรีเฟรชเพื่อความแม่นยำในอีก ${timeLeft} วินาที`;
+            timeLeft--;
+            if (timeLeft < 0) {
+                clearInterval(countdown);
                 window.location.reload();
             }
         }, 1000);
-    }
-
-    // สั่งงานรายตัว
-    async function handleUpdate(id) {
-        const val = relayStates[id] ? 0 : 1;
-        await fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
-        triggerRefresh();
-    }
-
-    // สั่งงาน Master
-    async function masterAction(val) {
-        const vPin = val === 1 ? 'V8' : 'V9';
-        await fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
-        triggerRefresh();
     }
 
     function updateUI() {
@@ -126,8 +143,7 @@
     window.onload = () => {
         syncStatus();
         checkServer();
-        // ตรวจสอบสถานะ Server ทุก 10 วินาทีโดยไม่รีเฟรชหน้า
-        setInterval(checkServer, 10000);
+        setInterval(checkServer, 10000); // เช็คสถานะออนไลน์ทุก 10 วิ
     };
 </script>
 </body>
