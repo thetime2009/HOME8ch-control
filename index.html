@@ -3,16 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - v1.7 (Stable Sync)</title>
+    <title>Home_8ch - v1.8 (Customizable Sync)</title>
     <style>
         :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; }
         body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
-        .server-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; background: #222; margin-bottom: 10px; }
+        
+        /* Server Status & Settings */
+        .header-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .server-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; background: #222; }
         .dot { width: 10px; height: 10px; border-radius: 50%; }
         .online { background: var(--bright-green); box-shadow: 0 0 10px var(--bright-green); }
         .offline { background: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
         
-        #refresh-banner { height: 25px; color: var(--bright-green); font-size: 0.8rem; margin-bottom: 10px; opacity: 0; transition: 0.3s; }
+        .settings-panel { font-size: 0.8rem; color: #aaa; background: #222; padding: 10px; border-radius: 12px; display: flex; gap: 10px; align-items: center; }
+        .settings-panel input { width: 40px; background: #333; border: 1px solid #444; color: var(--bright-green); text-align: center; border-radius: 4px; padding: 2px; }
+
+        #refresh-banner { height: 25px; color: var(--bright-green); font-size: 0.8rem; margin-bottom: 10px; opacity: 0; transition: 0.3s; font-weight: bold; }
         
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
         .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; user-select: none; }
@@ -25,7 +31,6 @@
 
         .master-controls { display: flex; gap: 10px; max-width: 800px; margin: 30px auto; }
         .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
-        .m-btn:active { transform: scale(0.95); }
         .btn-on { background: var(--bright-green); color: #000; }
         .btn-off { background: #444; color: #fff; }
         .version { font-size: 0.7rem; color: #444; margin-top: 20px; }
@@ -35,9 +40,17 @@
 
     <h1>HOME_8CH</h1>
     
-    <div class="server-status">
-        <div id="status-dot" class="dot offline"></div>
-        <span id="status-text" style="font-size: 0.8rem;">ตรวจสอบระบบ...</span>
+    <div class="header-controls">
+        <div class="server-status">
+            <div id="status-dot" class="dot offline"></div>
+            <span id="status-text" style="font-size: 0.8rem;">กำลังตรวจสอบ...</span>
+        </div>
+        
+        <!-- ส่วนตั้งค่าเวลารีเฟรช -->
+        <div class="settings-panel">
+            <span>ตั้งเวลารีเฟรช (วินาที):</span>
+            <input type="number" id="refresh-time-input" value="3" min="1" max="60">
+        </div>
     </div>
 
     <div id="refresh-banner">อัปเดตสถานะแล้ว...</div>
@@ -49,16 +62,16 @@
         <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด</button>
     </div>
 
-    <div class="version">v1.7 | Optimized Refresh & Fast Sync</div>
+    <div class="version">v1.8 | Customizable Auto-Refresh (3s Default)</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
     const API_BASE = "https://sgp1.blynk.cloud/external/api/";
 
     let relayStates = new Array(8).fill(false);
-    let refreshInterval = null; // ตัวแปรเก็บ Timer สำหรับการรีเฟรช
+    let refreshInterval = null;
 
-    // 1. สร้าง Interface ครั้งเดียว
+    // สร้างปุ่มควบคุม 8 ช่อง
     const grid = document.getElementById('main-grid');
     grid.innerHTML = relayStates.map((_, i) => `
         <div class="card" id="card-${i}" onclick="toggle(${i})">
@@ -67,68 +80,64 @@
         </div>
     `).join('');
 
-    // 2. ตรวจสอบสถานะ Online
+    // เช็คสถานะการเชื่อมต่อบอร์ด
     async function checkServer() {
         try {
             const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
             const isOnline = await res.json();
-            const dot = document.getElementById('status-dot');
-            const txt = document.getElementById('status-text');
-            dot.className = isOnline ? "dot online" : "dot offline";
-            txt.innerText = isOnline ? "BOARD ONLINE" : "BOARD OFFLINE";
-        } catch (e) { console.error("Connection Error"); }
+            document.getElementById('status-dot').className = isOnline ? "dot online" : "dot offline";
+            document.getElementById('status-text').innerText = isOnline ? "BOARD ONLINE" : "BOARD OFFLINE";
+        } catch (e) { console.error("Server check error"); }
     }
 
-    // 3. ซิงค์ค่าจริงจาก Blynk
+    // ซิงค์สถานะไฟจากเซิร์ฟเวอร์
     async function syncStatus() {
         try {
-            // ดึงค่า V0 ถึง V7
             const promises = relayStates.map((_, i) => fetch(`${API_BASE}get?token=${TOKEN}&V${i}`).then(r => r.text()));
             const results = await Promise.all(promises);
             relayStates = results.map(val => val.trim() === "1");
             updateUI();
-        } catch (err) { console.error("Sync Failed"); }
+        } catch (err) { console.error("Sync failed"); }
     }
 
-    // 4. ฟังก์ชันจัดการปุ่ม
+    // ฟังก์ชันเปิด-ปิดรายช่อง
     function toggle(id) {
-        relayStates[id] = !relayStates[id]; // เปลี่ยนทันทีบน UI
-        updateUI(); 
-
-        const val = relayStates[id] ? 1 : 0;
-        fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`); // ส่งค่าเบื้องหลัง
-
-        resetRefreshTimer(); // ตั้งเวลารีเฟรชใหม่ทุกครั้งที่กด
-    }
-
-    function masterAction(val) {
-        relayStates.fill(val === 1);
+        relayStates[id] = !relayStates[id];
         updateUI();
-
-        const vPin = val === 1 ? 'V8' : 'V9';
-        fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
-
+        const val = relayStates[id] ? 1 : 0;
+        fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
         resetRefreshTimer();
     }
 
-    // 5. ระบบจัดการ Timer (แก้ไขจุดที่ซ้ำซ้อน)
+    // ฟังก์ชันสั่งงานรวม
+    function masterAction(val) {
+        relayStates.fill(val === 1);
+        updateUI();
+        const vPin = val === 1 ? 'V8' : 'V9';
+        fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
+        resetRefreshTimer();
+    }
+
+    // --- ส่วนที่ปรับปรุง: ระบบตั้งเวลาได้เอง ---
     function resetRefreshTimer() {
         const banner = document.getElementById('refresh-banner');
-        banner.style.opacity = "1";
+        const timeInput = document.getElementById('refresh-time-input');
         
-        // ถ้ามี Timer เดิมอยู่ให้ยกเลิกก่อน (ป้องกันตัวเลขกระโดด)
+        // อ่านค่าจาก Input (ถ้าค่าไม่ใช่ตัวเลขให้ใช้ 3 วินาทีเป็นค่าเริ่มต้น)
+        let timeLeft = parseInt(timeInput.value) || 3;
+        
+        banner.style.opacity = "1";
         if (refreshInterval) clearInterval(refreshInterval);
         
-        let timeLeft = 5;
-        banner.innerText = `รับคำสั่งแล้ว! จะรีเฟรชข้อมูลในอีก ${timeLeft} วินาที`;
+        banner.innerText = `รับคำสั่งแล้ว! จะรีเฟรชหน้าเว็บใน ${timeLeft} วินาที`;
 
         refreshInterval = setInterval(() => {
             timeLeft--;
             if (timeLeft > 0) {
-                banner.innerText = `รับคำสั่งแล้ว! จะรีเฟรชข้อมูลในอีก ${timeLeft} วินาที`;
+                banner.innerText = `รับคำสั่งแล้ว! จะรีเฟรชหน้าเว็บใน ${timeLeft} วินาที`;
             } else {
                 clearInterval(refreshInterval);
-                banner.innerText = "กำลังซิงค์ข้อมูล...";
+                banner.innerText = "กำลังรีเฟรช...";
                 window.location.reload();
             }
         }, 1000);
@@ -144,7 +153,7 @@
     window.onload = () => {
         syncStatus();
         checkServer();
-        setInterval(checkServer, 15000); // เช็คสถานะทุก 15 วิ
+        setInterval(checkServer, 15000);
     };
 </script>
 </body>
