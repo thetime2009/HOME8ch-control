@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Relay Control</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: white; text-align: center; padding: 20px; }
+        .container { max-width: 600px; margin: auto; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-on { background: #10b981; color: white; margin-bottom: 5px; }
+        .btn-off { background: #ef4444; color: white; }
+        .btn-all-on { background: #3b82f6; margin-top: 20px; padding: 15px; font-size: 1.1rem; }
+        .btn-all-off { background: #64748b; margin-top: 10px; padding: 15px; font-size: 1.1rem; }
+        .status { margin-top: 10px; font-size: 0.8rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Smart Relay Cloud Control</h2>
+    <p>Token: <span id="token-display" style="color: #3b82f6;">กำลังโหลด...</span></p>
+
+    <div class="grid" id="controls">
+        <!-- สร้างปุ่ม 8 ช่อง -->
+    </div>
+
+    <button class="btn-all-on" onclick="masterControl('V8', 1)">เปิดทั้งหมด (All ON)</button>
+    <button class="btn-all-off" onclick="masterControl('V9', 1)">ปิดทั้งหมด (All OFF)</button>
+    
+    <div id="log" class="status">สถานะ: พร้อมใช้งาน</div>
+</div>
+
+<script>
+    // *** แก้ไข Token ของคุณที่นี่ ***
+    const BLYNK_AUTH_TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
+    const BLYNK_API_URL = "https://sgp1.blynk.cloud/external/api/update?token=" + BLYNK_AUTH_TOKEN;
+
+    document.getElementById('token-display').innerText = BLYNK_AUTH_TOKEN.substring(0, 8) + "********";
+
+    // สร้างปุ่มควบคุม 1-8
+    const controls = document.getElementById('controls');
+    for (let i = 0; i < 8; i++) {
+        controls.innerHTML += `
+            <div class="card">
+                <div style="margin-bottom:10px">Relay ${i+1}</div>
+                <button class="btn-on" onclick="sendCMD('V${i}', 1)">ON</button>
+                <button class="btn-off" onclick="sendCMD('V${i}', 0)">OFF</button>
+            </div>
+        `;
+    }
+
+    async function sendCMD(pin, value) {
+        const url = `${BLYNK_API_URL}&${pin}=${value}`;
+        updateLog(`กำลังส่งคำสั่งไปที่ ${pin}...`);
+        try {
+            await fetch(url);
+            updateLog(`สำเร็จ: ${pin} เป็น ${value == 1 ? 'ON' : 'OFF'}`);
+        } catch (err) {
+            updateLog("เกิดข้อผิดพลาดในการเชื่อมต่อ!");
+        }
+    }
+
+    async function masterControl(pin, value) {
+        await sendCMD(pin, value);
+        updateLog(`ส่งคำสั่ง Master (${pin}) สำเร็จ`);
+    }
+
+    function updateLog(msg) {
+        document.getElementById('log').innerText = "สถานะ: " + msg;
+    }
+</script>
+
+</body>
+</html>
