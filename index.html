@@ -3,34 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - v1.3 (Real-time Sync)</title>
+    <title>Home_8ch - v1.4 (Auto Refresh)</title>
     <style>
-        :root { 
-            --bright-green: #26ff00; 
-            --dark-bg: #0a0a0a; 
-            --card-bg: #1a1a1a; 
-            --offline-red: #ff3131;
-        }
+        :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; }
         body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
-        
-        /* Server Status UI */
-        .server-status {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 8px 16px; border-radius: 20px; background: #222; margin-bottom: 20px;
-        }
+        .server-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; background: #222; margin-bottom: 20px; }
         .dot { width: 10px; height: 10px; border-radius: 50%; }
         .online { background: var(--bright-green); box-shadow: 0 0 10px var(--bright-green); }
         .offline { background: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
-
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
         .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; }
         .card.active { border-color: var(--bright-green); box-shadow: 0 0 15px rgba(38, 255, 0, 0.2); }
-        
         .btn-toggle { width: 60px; height: 30px; background: #333; border-radius: 20px; position: relative; cursor: pointer; margin: 15px auto 0; }
         .btn-toggle::before { content: ''; position: absolute; width: 22px; height: 22px; background: #fff; border-radius: 50%; top: 4px; left: 4px; transition: 0.3s; }
         .active .btn-toggle { background: var(--bright-green); }
         .active .btn-toggle::before { left: 34px; }
-
         .master-controls { display: flex; gap: 10px; max-width: 800px; margin: 30px auto; }
         .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; }
         .btn-on { background: var(--bright-green); color: #000; }
@@ -54,7 +41,7 @@
         <button class="m-btn btn-off" onclick="masterAction(0)">ALL OFF</button>
     </div>
 
-    <div class="version">v1.3 Stable Sync | แก้ไขระบบอัปเดตดีเลย์</div>
+    <div class="version">v1.4 | ระบบรีเฟรชหน้าเว็บอัตโนมัติเมื่อมีการสั่งงาน</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
@@ -62,7 +49,6 @@
 
     let relayStates = new Array(8).fill(false);
 
-    // สร้าง UI
     const grid = document.getElementById('main-grid');
     for(let i=0; i<8; i++) {
         grid.innerHTML += `
@@ -73,7 +59,6 @@
         `;
     }
 
-    // ฟังก์ชันตรวจสอบสถานะบอร์ด
     async function checkServer() {
         try {
             const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
@@ -83,7 +68,6 @@
         } catch (e) { console.error("Server Check Error"); }
     }
 
-    // ฟังก์ชันดึงสถานะจาก Blynk
     async function syncStatus() {
         try {
             for(let i=0; i<8; i++) {
@@ -97,43 +81,41 @@
         } catch (err) { console.error("Sync Error"); }
     }
 
-    // ฟังก์ชันควบคุมรายตัว
+    // --- ส่วนที่ปรับปรุง: เพิ่มการรีเฟรช ---
     async function toggle(id) {
-        // 1. เปลี่ยนสถานะบนหน้าเว็บทันที (Optimistic UI)
-        relayStates[id] = !relayStates[id];
-        updateUI();
-
-        // 2. ส่งคำสั่งไป Blynk
-        const val = relayStates[id] ? 1 : 0;
+        const val = relayStates[id] ? 0 : 1; // สลับสถานะ
+        
+        // ส่งคำสั่งไปยัง Cloud และรอให้เสร็จสิ้น
         await fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
-
-        // 3. หน่วงเวลา 800ms แล้วซิงค์ค่าจริงกลับมาอีกครั้งเพื่อความแม่นยำ
-        setTimeout(syncStatus, 800);
+        
+        // บังคับรีเฟรชหน้าเว็บทันทีหลังจากคำสั่งส่งเสร็จ
+        window.location.reload();
     }
 
     async function masterAction(val) {
         const vPin = val === 1 ? 'V8' : 'V9';
-        relayStates.fill(val === 1);
-        updateUI();
         
         await fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
         
-        // Master action ใช้เวลาประมวลผลนานกว่า จึงหน่วง 1.5 วินาที
-        setTimeout(syncStatus, 1500);
+        // บังคับรีเฟรชหน้าเว็บหลังจากสั่ง All ON/OFF
+        // หน่วงเวลาเล็กน้อย 500ms เพื่อให้ Cloud ประมวลผลทันก่อนโหลดใหม่
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     }
 
     function updateUI() {
         relayStates.forEach((state, i) => {
             const card = document.getElementById(`card-${i}`);
-            state ? card.classList.add('active') : card.classList.remove('active');
+            if(state) card.classList.add('active');
+            else card.classList.remove('active');
         });
     }
 
-    // เริ่มทำงานเมื่อโหลดหน้าเว็บ
     window.onload = () => {
         syncStatus();
         checkServer();
-        setInterval(checkServer, 10000); // เช็คสถานะบอร์ดทุก 10 วินาที
+        setInterval(checkServer, 10000);
     };
 </script>
 </body>
