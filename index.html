@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - Smart Control</title>
+    <title>Home_8ch - Smart Sync Control</title>
     <style>
         :root {
-            --primary-green: #2ecc71;
-            --bright-green: #26ff00;
+            --bright-green: #26ff00; /* สีเขียวสว่างตามโจทย์ */
             --dark-bg: #0a0a0a;
             --card-bg: #1a1a1a;
+            --text-gray: #888;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, sans-serif;
             background-color: var(--dark-bg);
             color: #ffffff;
             margin: 0;
@@ -27,207 +27,172 @@
 
         .header h1 {
             color: var(--bright-green);
-            text-shadow: 0 0 15px rgba(38, 255, 0, 0.4);
+            text-shadow: 0 0 20px rgba(38, 255, 0, 0.5);
             margin: 0;
+            letter-spacing: 2px;
         }
 
-        .server-status {
+        .status-badge {
             font-size: 0.8rem;
-            margin-top: 5px;
-            color: #888;
+            color: var(--text-gray);
+            margin-top: 10px;
         }
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            max-width: 1200px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            max-width: 900px;
             margin: auto;
         }
 
         .card {
             background: var(--card-bg);
-            border-radius: 20px;
+            border-radius: 18px;
             padding: 20px;
             border: 1px solid #333;
-            transition: 0.3s;
+            text-align: center;
+            transition: all 0.3s ease;
         }
 
+        /* เมื่อ Relay เปิดอยู่ */
         .card.active {
             border-color: var(--bright-green);
-            box-shadow: 0 0 20px rgba(38, 255, 0, 0.1);
+            box-shadow: 0 0 15px rgba(38, 255, 0, 0.2);
         }
 
-        .relay-title {
-            font-size: 1.2rem;
+        .relay-name {
             font-weight: bold;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
+            margin-bottom: 15px;
+            display: block;
         }
 
-        /* ปุ่ม Toggle สไตล์เขียวสว่าง */
         .btn-toggle {
-            width: 100%;
-            padding: 15px;
-            border-radius: 12px;
-            border: none;
+            width: 70px;
+            height: 35px;
             background: #333;
-            color: white;
-            font-weight: bold;
+            border-radius: 20px;
+            position: relative;
             cursor: pointer;
-            margin: 10px 0;
-            transition: 0.3s;
+            margin: auto;
+            transition: 0.4s;
         }
 
-        .active .btn-toggle {
-            background: var(--bright-green);
-            color: #000;
+        .btn-toggle::before {
+            content: '';
+            position: absolute;
+            width: 27px;
+            height: 27px;
+            background: #fff;
+            border-radius: 50%;
+            top: 4px;
+            left: 4px;
+            transition: 0.4s;
         }
 
-        /* ส่วนตั้งเวลา */
-        .scheduler {
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 10px;
-            font-size: 0.85rem;
-        }
-
-        .scheduler input {
-            background: #222;
-            border: 1px solid #444;
-            color: var(--bright-green);
-            padding: 5px;
-            border-radius: 5px;
-            width: 100px;
-        }
+        .active .btn-toggle { background: var(--bright-green); }
+        .active .btn-toggle::before { left: 39px; }
 
         .master-controls {
             display: flex;
-            gap: 15px;
-            max-width: 1200px;
+            gap: 10px;
+            max-width: 900px;
             margin: 30px auto;
         }
 
-        .master-btn {
+        .m-btn {
             flex: 1;
-            padding: 20px;
-            border-radius: 15px;
+            padding: 15px;
+            border-radius: 12px;
             border: none;
             font-weight: bold;
             cursor: pointer;
-            font-size: 1rem;
+            font-size: 0.9rem;
+            transition: 0.2s;
         }
 
-        .btn-all-on { background: var(--bright-green); color: black; }
-        .btn-all-off { background: #444; color: white; }
+        .btn-on { background: var(--bright-green); color: #000; }
+        .btn-off { background: #444; color: #fff; }
+        .m-btn:active { transform: scale(0.95); }
 
-        .runtime-label { color: var(--bright-green); font-family: monospace; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
 <div class="header">
     <h1>HOME_8CH</h1>
-    <div class="server-status" id="status-text">SYSTEM READY</div>
+    <div class="status-badge" id="sync-status">กำลังซิงค์สถานะ...</div>
 </div>
 
-<div class="grid" id="main-grid"></div>
+<div class="grid" id="main-grid">
+    <!-- ปุ่มจะถูกสร้างที่นี่ -->
+</div>
 
 <div class="master-controls">
-    <button class="master-btn btn-all-on" onclick="allAction(1)">เปิดทั้งหมด (ALL ON)</button>
-    <button class="master-btn btn-all-off" onclick="allAction(0)">ปิดทั้งหมด (ALL OFF)</button>
+    <button class="m-btn btn-on" onclick="masterAction(1)">เปิดทั้งหมด (ALL ON)</button>
+    <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด (ALL OFF)</button>
 </div>
 
 <script>
-    const BLYNK_TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
-    const API_URL = "https://sgp1.blynk.cloud/external/api/";
+    const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
+    const API_BASE = "https://sgp1.blynk.cloud/external/api/";
 
-    // เก็บสถานะแต่ละช่อง
-    let devices = Array(8).fill(null).map(() => ({
-        active: false,
-        startTime: null,
-        schedOn: null,
-        schedOff: null
-    }));
+    // เก็บสถานะจริง 8 ช่อง
+    let relayStates = new Array(8).fill(false);
 
-    // สร้าง UI 8 ช่อง
+    // 1. สร้าง UI
     const grid = document.getElementById('main-grid');
     for(let i=0; i<8; i++) {
         grid.innerHTML += `
             <div class="card" id="card-${i}">
-                <div class="relay-title">
-                    <span>Relay ${i+1}</span>
-                    <span id="run-${i}" class="runtime-label"></span>
-                </div>
-                <button class="btn-toggle" onclick="toggle(${i})">สวิตช์ควบคุม</button>
-                
-                <div class="scheduler">
-                    <div style="margin-bottom:5px">ตั้งเวลาเปิด: <input type="time" step="1" id="on-time-${i}"></div>
-                    <div>ตั้งเวลาปิด: <input type="time" step="1" id="off-time-${i}"></div>
-                </div>
+                <span class="relay-name">Relay ${i+1}</span>
+                <div class="btn-toggle" onclick="toggle(${i})"></div>
             </div>
         `;
     }
 
-    async function toggle(id) {
-        devices[id].active = !devices[id].active;
-        if(devices[id].active) devices[id].startTime = Date.now();
-        else devices[id].startTime = null;
-        
-        updateUI();
-        await fetch(`${API_URL}update?token=${BLYNK_TOKEN}&V${id}=${devices[id].active ? 1 : 0}`);
-    }
-
-    async function allAction(val) {
-        for(let i=0; i<8; i++) {
-            devices[i].active = (val === 1);
-            devices[i].startTime = (val === 1) ? Date.now() : null;
+    // 2. ฟังก์ชันดึงสถานะจาก Cloud (Sync)
+    async function syncStatus() {
+        document.getElementById('sync-status').innerText = "กำลังดึงข้อมูลจาก Cloud...";
+        try {
+            for(let i=0; i<8; i++) {
+                const res = await fetch(`${API_BASE}get?token=${TOKEN}&V${i}`);
+                const val = await res.text();
+                relayStates[i] = (val == "1");
+            }
+            updateUI();
+            document.getElementById('sync-status').innerText = "สถานะปัจจุบันอัปเดตแล้ว";
+        } catch (err) {
+            document.getElementById('sync-status').innerText = "ซิงค์ไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ";
         }
+    }
+
+    // 3. ฟังก์ชันควบคุมรายตัว
+    async function toggle(id) {
+        relayStates[id] = !relayStates[id];
+        const val = relayStates[id] ? 1 : 0;
         updateUI();
-        const vPin = val === 1 ? 'V8' : 'V9';
-        await fetch(`${API_URL}update?token=${BLYNK_TOKEN}&${vPin}=1`);
+        await fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
     }
 
+    // 4. ฟังก์ชัน Master
+    async function masterAction(val) {
+        const vPin = (val === 1) ? 'V8' : 'V9';
+        relayStates.fill(val === 1);
+        updateUI();
+        await fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
+    }
+
+    // 5. อัปเดตการแสดงผลบนเว็บ
     function updateUI() {
-        devices.forEach((dev, i) => {
+        relayStates.forEach((state, i) => {
             const card = document.getElementById(`card-${i}`);
-            dev.active ? card.classList.add('active') : card.classList.remove('active');
+            state ? card.classList.add('active') : card.classList.remove('active');
         });
     }
 
-    // ฟังก์ชันตรวจสอบเวลาทุกวินาที
-    setInterval(() => {
-        const now = new Date();
-        const currentTime = now.toTimeString().split(' ')[0]; // รูปแบบ HH:MM:SS
-
-        devices.forEach((dev, i) => {
-            // อัปเดต Runtime
-            if(dev.active && dev.startTime) {
-                const diff = Math.floor((Date.now() - dev.startTime) / 1000);
-                const h = Math.floor(diff / 3600).toString().padStart(2, '0');
-                const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
-                const s = (diff % 60).toString().padStart(2, '0');
-                document.getElementById(`run-${i}`).innerText = `${h}:${m}:${s}`;
-            } else {
-                document.getElementById(`run-${i}`).innerText = "";
-            }
-
-            // ตรวจสอบการตั้งเวลาเปิด
-            const onInput = document.getElementById(`on-time-${i}`).value;
-            if(onInput && onInput === currentTime && !dev.active) {
-                toggle(i);
-                document.getElementById(`on-time-${i}`).value = ""; // รีเซ็ตค่าหลังทำงาน
-            }
-
-            // ตรวจสอบการตั้งเวลาปิด
-            const offInput = document.getElementById(`off-time-${i}`).value;
-            if(offInput && offInput === currentTime && dev.active) {
-                toggle(i);
-                document.getElementById(`off-time-${i}`).value = ""; // รีเซ็ตค่าหลังทำงาน
-            }
-        });
-    }, 1000);
+    // เริ่มต้นดึงข้อมูลเมื่อโหลดหน้าเว็บ
+    window.onload = syncStatus;
 
 </script>
 </body>
