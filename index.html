@@ -3,101 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Smart Control 8CH</title>
+    <title>Home_8ch - Smart Control</title>
     <style>
         :root {
-            --bg: #050505;
-            --card: rgba(23, 23, 23, 0.8);
-            --neon-blue: #00d2ff;
-            --neon-green: #39ff14;
-            --neon-red: #ff3131;
+            --primary-green: #2ecc71;
+            --bright-green: #26ff00;
+            --dark-bg: #0a0a0a;
+            --card-bg: #1a1a1a;
         }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; padding: 20px; text-align: center; }
-        
-        /* Server Status Badge */
-        .status-badge {
-            display: inline-flex; align-items: center; padding: 5px 15px; border-radius: 20px;
-            font-size: 0.8rem; margin-bottom: 20px; background: rgba(255,255,255,0.05);
-        }
-        .dot { height: 8px; width: 8px; border-radius: 50%; margin-right: 8px; }
-        .online { background: var(--neon-green); box-shadow: 0 0 10px var(--neon-green); }
-        .offline { background: var(--neon-red); }
 
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
-        
-        .relay-card {
-            background: var(--card); border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 20px; padding: 15px; transition: 0.4s; position: relative;
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark-bg);
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
         }
-        .relay-card.active { border-color: var(--neon-blue); box-shadow: 0 0 15px rgba(0,210,255,0.2); }
 
-        .btn-main {
-            width: 100%; height: 60px; border-radius: 15px; border: none; font-weight: bold;
-            cursor: pointer; margin-top: 10px; transition: 0.3s; color: white;
-            background: #222; font-size: 1rem;
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
         }
-        .active .btn-main { background: var(--neon-blue); color: black; }
-        
-        .timer-display { font-size: 0.75rem; color: var(--neon-blue); margin-top: 5px; height: 15px; font-family: monospace; }
-        
-        /* Schedule Input */
-        .schedule-box { margin-top: 10px; font-size: 0.7rem; color: #777; }
-        .schedule-input { width: 50px; background: transparent; border: 1px solid #444; color: white; border-radius: 5px; text-align: center; }
 
+        .header h1 {
+            color: var(--bright-green);
+            text-shadow: 0 0 15px rgba(38, 255, 0, 0.4);
+            margin: 0;
+        }
+
+        .server-status {
+            font-size: 0.8rem;
+            margin-top: 5px;
+            color: #888;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #333;
+            transition: 0.3s;
+        }
+
+        .card.active {
+            border-color: var(--bright-green);
+            box-shadow: 0 0 20px rgba(38, 255, 0, 0.1);
+        }
+
+        .relay-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* ปุ่ม Toggle สไตล์เขียวสว่าง */
+        .btn-toggle {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: none;
+            background: #333;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: 0.3s;
+        }
+
+        .active .btn-toggle {
+            background: var(--bright-green);
+            color: #000;
+        }
+
+        /* ส่วนตั้งเวลา */
+        .scheduler {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+        }
+
+        .scheduler input {
+            background: #222;
+            border: 1px solid #444;
+            color: var(--bright-green);
+            padding: 5px;
+            border-radius: 5px;
+            width: 100px;
+        }
+
+        .master-controls {
+            display: flex;
+            gap: 15px;
+            max-width: 1200px;
+            margin: 30px auto;
+        }
+
+        .master-btn {
+            flex: 1;
+            padding: 20px;
+            border-radius: 15px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-all-on { background: var(--bright-green); color: black; }
+        .btn-all-off { background: #444; color: white; }
+
+        .runtime-label { color: var(--bright-green); font-family: monospace; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
-    <div class="status-badge">
-        <div id="status-dot" class="dot offline"></div>
-        <span id="status-text">SERVER OFFLINE</span>
-    </div>
+<div class="header">
+    <h1>HOME_8CH</h1>
+    <div class="server-status" id="status-text">SYSTEM READY</div>
+</div>
 
-    <div class="grid" id="main-grid"></div>
+<div class="grid" id="main-grid"></div>
+
+<div class="master-controls">
+    <button class="master-btn btn-all-on" onclick="allAction(1)">เปิดทั้งหมด (ALL ON)</button>
+    <button class="master-btn btn-all-off" onclick="allAction(0)">ปิดทั้งหมด (ALL OFF)</button>
+</div>
 
 <script>
-    const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
-    const API_BASE = `https://sgp1.blynk.cloud/external/api/`;
-    
-    let devices = Array(8).fill(null).map(() => ({ active: false, startTime: null, timer: null }));
+    const BLYNK_TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
+    const API_URL = "https://sgp1.blynk.cloud/external/api/";
 
-    // สร้าง UI
+    // เก็บสถานะแต่ละช่อง
+    let devices = Array(8).fill(null).map(() => ({
+        active: false,
+        startTime: null,
+        schedOn: null,
+        schedOff: null
+    }));
+
+    // สร้าง UI 8 ช่อง
     const grid = document.getElementById('main-grid');
     for(let i=0; i<8; i++) {
         grid.innerHTML += `
-            <div class="relay-card" id="card-${i}">
-                <div style="font-size:0.9rem">Relay ${i+1}</div>
-                <div id="time-${i}" class="timer-display"></div>
-                <button class="btn-main" onclick="toggleRelay(${i})">ON / OFF</button>
-                <div class="schedule-box">
-                    ปิดอัตโนมัติใน <input type="number" id="sched-${i}" class="schedule-input" placeholder="0"> นาที
+            <div class="card" id="card-${i}">
+                <div class="relay-title">
+                    <span>Relay ${i+1}</span>
+                    <span id="run-${i}" class="runtime-label"></span>
+                </div>
+                <button class="btn-toggle" onclick="toggle(${i})">สวิตช์ควบคุม</button>
+                
+                <div class="scheduler">
+                    <div style="margin-bottom:5px">ตั้งเวลาเปิด: <input type="time" step="1" id="on-time-${i}"></div>
+                    <div>ตั้งเวลาปิด: <input type="time" step="1" id="off-time-${i}"></div>
                 </div>
             </div>
         `;
     }
 
-    async function toggleRelay(id) {
+    async function toggle(id) {
         devices[id].active = !devices[id].active;
-        const val = devices[id].active ? 1 : 0;
+        if(devices[id].active) devices[id].startTime = Date.now();
+        else devices[id].startTime = null;
         
-        if(devices[id].active) {
-            devices[id].startTime = Date.now();
-            checkSchedule(id);
-        } else {
-            devices[id].startTime = null;
-        }
-
         updateUI();
-        await fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
+        await fetch(`${API_URL}update?token=${BLYNK_TOKEN}&V${id}=${devices[id].active ? 1 : 0}`);
     }
 
-    function checkSchedule(id) {
-        const mins = document.getElementById(`sched-${id}`).value;
-        if(mins > 0) {
-            setTimeout(() => {
-                if(devices[id].active) toggleRelay(id);
-            }, mins * 60000);
+    async function allAction(val) {
+        for(let i=0; i<8; i++) {
+            devices[i].active = (val === 1);
+            devices[i].startTime = (val === 1) ? Date.now() : null;
         }
+        updateUI();
+        const vPin = val === 1 ? 'V8' : 'V9';
+        await fetch(`${API_URL}update?token=${BLYNK_TOKEN}&${vPin}=1`);
     }
 
     function updateUI() {
@@ -107,36 +196,37 @@
         });
     }
 
-    // ฟังก์ชันเช็ค Server Status
-    async function checkServer() {
-        try {
-            const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
-            const isOnline = await res.json();
-            const dot = document.getElementById('status-dot');
-            const txt = document.getElementById('status-text');
-            if(isOnline) {
-                dot.className = "dot online";
-                txt.innerText = "SERVER ONLINE";
-            } else {
-                dot.className = "dot offline";
-                txt.innerText = "SERVER OFFLINE";
-            }
-        } catch(e) {}
-    }
-
-    // Loop อัปเดตเวลาในปุ่ม
+    // ฟังก์ชันตรวจสอบเวลาทุกวินาที
     setInterval(() => {
+        const now = new Date();
+        const currentTime = now.toTimeString().split(' ')[0]; // รูปแบบ HH:MM:SS
+
         devices.forEach((dev, i) => {
+            // อัปเดต Runtime
             if(dev.active && dev.startTime) {
                 const diff = Math.floor((Date.now() - dev.startTime) / 1000);
-                const m = Math.floor(diff / 60).toString().padStart(2, '0');
+                const h = Math.floor(diff / 3600).toString().padStart(2, '0');
+                const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
                 const s = (diff % 60).toString().padStart(2, '0');
-                document.getElementById(`time-${i}`).innerText = `RUNNING: ${m}:${s}`;
+                document.getElementById(`run-${i}`).innerText = `${h}:${m}:${s}`;
             } else {
-                document.getElementById(`time-${i}`).innerText = "";
+                document.getElementById(`run-${i}`).innerText = "";
+            }
+
+            // ตรวจสอบการตั้งเวลาเปิด
+            const onInput = document.getElementById(`on-time-${i}`).value;
+            if(onInput && onInput === currentTime && !dev.active) {
+                toggle(i);
+                document.getElementById(`on-time-${i}`).value = ""; // รีเซ็ตค่าหลังทำงาน
+            }
+
+            // ตรวจสอบการตั้งเวลาปิด
+            const offInput = document.getElementById(`off-time-${i}`).value;
+            if(offInput && offInput === currentTime && dev.active) {
+                toggle(i);
+                document.getElementById(`off-time-${i}`).value = ""; // รีเซ็ตค่าหลังทำงาน
             }
         });
-        checkServer();
     }, 1000);
 
 </script>
