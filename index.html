@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - v2.2 (Silent Sync)</title>
+    <title>Home_8ch - v2.3 (Visual Status)</title>
     <style>
-        :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; }
+        :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; --bulb-off: #444; --bulb-on: #ffd700; }
         body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
         
         .header-controls { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 30px; }
@@ -15,17 +15,20 @@
         .offline { background: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
 
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
-        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; }
+        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .card.active { border-color: var(--bright-green); box-shadow: 0 0 15px rgba(38, 255, 0, 0.2); }
         
-        .btn-toggle { width: 60px; height: 30px; background: #333; border-radius: 20px; position: relative; margin: 15px auto 0; pointer-events: none; }
-        .btn-toggle::before { content: ''; position: absolute; width: 22px; height: 22px; background: #fff; border-radius: 50%; top: 4px; left: 4px; transition: 0.3s; }
+        /* สไตล์ของรูปหลอดไฟ */
+        .bulb-icon { width: 40px; height: 40px; fill: var(--bulb-off); transition: 0.3s; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); }
+        .active .bulb-icon { fill: var(--bulb-on); filter: drop-shadow(0 0 8px var(--bulb-on)); }
+
+        .btn-toggle { width: 50px; height: 25px; background: #333; border-radius: 20px; position: relative; pointer-events: none; }
+        .btn-toggle::before { content: ''; position: absolute; width: 19px; height: 19px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: 0.3s; }
         .active .btn-toggle { background: var(--bright-green); }
-        .active .btn-toggle::before { left: 34px; }
+        .active .btn-toggle::before { left: 28px; }
 
         .master-controls { display: flex; gap: 10px; max-width: 800px; margin: 30px auto; }
         .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
-        .m-btn:active { transform: scale(0.98); }
         .btn-on { background: var(--bright-green); color: #000; }
         .btn-off { background: #444; color: #fff; }
         .version { font-size: 0.7rem; color: #444; margin-top: 20px; }
@@ -49,7 +52,7 @@
         <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด</button>
     </div>
 
-    <div class="version">v2.2 | 2s Background Sync (No UI)</div>
+    <div class="version">v2.3 | Visual Bulbs & 2s Silent Sync</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
@@ -57,16 +60,23 @@
 
     let relayStates = new Array(8).fill(false);
 
-    // 1. สร้าง Interface อัตโนมัติ
+    // ไอคอนหลอดไฟ SVG
+    const bulbSVG = `
+        <svg class="bulb-icon" viewBox="0 0 24 24">
+            <path d="M12,2A7,7 0 0,0 5,9C5,11.39 6.19,13.5 8,14.74V17A1,1 0 0,0 9,18H15A1,1 0 0,0 16,17V14.74C17.81,13.5 19,11.39 19,9A7,7 0 0,0 12,2M9,21A1,1 0 0,0 10,22H14A1,1 0 0,0 15,21V20H9V21Z" />
+        </svg>
+    `;
+
+    // 1. สร้าง Interface (เปลี่ยนเป็น "หลอดที่")
     const grid = document.getElementById('main-grid');
     grid.innerHTML = relayStates.map((_, i) => `
         <div class="card" id="card-${i}" onclick="toggle(${i})">
-            <span>ช่องที่ ${i+1}</span>
+            ${bulbSVG}
+            <span>หลอดที่ ${i+1}</span>
             <div class="btn-toggle"></div>
         </div>
     `).join('');
 
-    // 2. ตรวจสอบบอร์ด Online
     async function checkServer() {
         try {
             const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
@@ -76,7 +86,6 @@
         } catch (e) { console.error("Connection Error"); }
     }
 
-    // 3. ดึงสถานะไฟจาก Cloud
     async function syncStatus() {
         try {
             const promises = relayStates.map((_, i) => fetch(`${API_BASE}get?token=${TOKEN}&V${i}`).then(r => r.text()));
@@ -86,14 +95,12 @@
         } catch (err) { console.error("Sync Error"); }
     }
 
-    // 4. สั่งงานรายช่อง
     function toggle(id) {
         relayStates[id] = !relayStates[id];
         updateUI();
         fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${relayStates[id] ? 1 : 0}`);
     }
 
-    // 5. สั่งงานกลุ่ม
     function masterAction(val) {
         relayStates.fill(val === 1);
         updateUI();
@@ -108,16 +115,13 @@
         });
     }
 
-    // เริ่มทำงานและตั้งระบบวนลูปทุก 2 วินาที
     window.onload = () => {
         syncStatus();
         checkServer();
-        
-        // ระบบซิงค์อัตโนมัติเบื้องหลังทุก 2 วินาที (2000ms)
         setInterval(() => {
             syncStatus();
             checkServer();
-        }, 2000);
+        }, 2000); // ทำงานเบื้องหลังทุก 2 วินาที
     };
 </script>
 </body>
