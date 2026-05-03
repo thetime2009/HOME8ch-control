@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - v1.6 (Instant & Sync)</title>
+    <title>Home_8ch - v1.7 (Stable Sync)</title>
     <style>
         :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; }
         body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
@@ -12,11 +12,10 @@
         .online { background: var(--bright-green); box-shadow: 0 0 10px var(--bright-green); }
         .offline { background: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
         
-        /* แจ้งเตือนการรีเฟรช */
-        #refresh-banner { height: 25px; color: var(--bright-green); font-size: 0.8rem; margin-bottom: 10px; transition: 0.3s; opacity: 0; }
+        #refresh-banner { height: 25px; color: var(--bright-green); font-size: 0.8rem; margin-bottom: 10px; opacity: 0; transition: 0.3s; }
         
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
-        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; }
+        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; user-select: none; }
         .card.active { border-color: var(--bright-green); box-shadow: 0 0 15px rgba(38, 255, 0, 0.2); }
         
         .btn-toggle { width: 60px; height: 30px; background: #333; border-radius: 20px; position: relative; margin: 15px auto 0; pointer-events: none; }
@@ -25,7 +24,8 @@
         .active .btn-toggle::before { left: 34px; }
 
         .master-controls { display: flex; gap: 10px; max-width: 800px; margin: 30px auto; }
-        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .m-btn:active { transform: scale(0.95); }
         .btn-on { background: var(--bright-green); color: #000; }
         .btn-off { background: #444; color: #fff; }
         .version { font-size: 0.7rem; color: #444; margin-top: 20px; }
@@ -37,10 +37,10 @@
     
     <div class="server-status">
         <div id="status-dot" class="dot offline"></div>
-        <span id="status-text" style="font-size: 0.8rem;">กำลังโหลด...</span>
+        <span id="status-text" style="font-size: 0.8rem;">ตรวจสอบระบบ...</span>
     </div>
 
-    <div id="refresh-banner">สถานะอัปเดตแล้ว... กำลังซิงค์ข้อมูลใน 5 วิ</div>
+    <div id="refresh-banner">อัปเดตสถานะแล้ว...</div>
 
     <div class="grid" id="main-grid"></div>
 
@@ -49,84 +49,86 @@
         <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด</button>
     </div>
 
-    <div class="version">v1.6 | Instant UI + 5s Auto-Refresh Sync</div>
+    <div class="version">v1.7 | Optimized Refresh & Fast Sync</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
     const API_BASE = "https://sgp1.blynk.cloud/external/api/";
 
     let relayStates = new Array(8).fill(false);
+    let refreshInterval = null; // ตัวแปรเก็บ Timer สำหรับการรีเฟรช
 
-    // 1. สร้าง Interface
+    // 1. สร้าง Interface ครั้งเดียว
     const grid = document.getElementById('main-grid');
-    for(let i=0; i<8; i++) {
-        grid.innerHTML += `
-            <div class="card" id="card-${i}" onclick="toggle(${i})">
-                <span>ช่องที่ ${i+1}</span>
-                <div class="btn-toggle"></div>
-            </div>
-        `;
-    }
+    grid.innerHTML = relayStates.map((_, i) => `
+        <div class="card" id="card-${i}" onclick="toggle(${i})">
+            <span>ช่องที่ ${i+1}</span>
+            <div class="btn-toggle"></div>
+        </div>
+    `).join('');
 
-    // 2. ฟังก์ชันตรวจสอบสถานะบอร์ด
+    // 2. ตรวจสอบสถานะ Online
     async function checkServer() {
         try {
             const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
             const isOnline = await res.json();
-            document.getElementById('status-dot').className = isOnline ? "dot online" : "dot offline";
-            document.getElementById('status-text').innerText = isOnline ? "BOARD ONLINE" : "BOARD OFFLINE";
-        } catch (e) { console.error("Server Check Error"); }
+            const dot = document.getElementById('status-dot');
+            const txt = document.getElementById('status-text');
+            dot.className = isOnline ? "dot online" : "dot offline";
+            txt.innerText = isOnline ? "BOARD ONLINE" : "BOARD OFFLINE";
+        } catch (e) { console.error("Connection Error"); }
     }
 
-    // 3. ฟังก์ชันซิงค์ข้อมูลเริ่มต้น
+    // 3. ซิงค์ค่าจริงจาก Blynk
     async function syncStatus() {
         try {
-            for(let i=0; i<8; i++) {
-                const res = await fetch(`${API_BASE}get?token=${TOKEN}&V${i}`);
-                if (res.ok) {
-                    const val = await res.text();
-                    relayStates[i] = (val.trim() === "1");
-                }
-            }
+            // ดึงค่า V0 ถึง V7
+            const promises = relayStates.map((_, i) => fetch(`${API_BASE}get?token=${TOKEN}&V${i}`).then(r => r.text()));
+            const results = await Promise.all(promises);
+            relayStates = results.map(val => val.trim() === "1");
             updateUI();
-        } catch (err) { console.error("Initial Sync Failed"); }
+        } catch (err) { console.error("Sync Failed"); }
     }
 
-    // 4. ฟังก์ชันจัดการเมื่อมีการกดปุ่ม (ไฮไลท์: เปลี่ยนทันที + หน่วงเวลาซิงค์)
-    async function toggle(id) {
-        // --- ส่วนที่ 1: สถานะเปลี่ยนทันที (Instant Update) ---
-        relayStates[id] = !relayStates[id]; 
+    // 4. ฟังก์ชันจัดการปุ่ม
+    function toggle(id) {
+        relayStates[id] = !relayStates[id]; // เปลี่ยนทันทีบน UI
         updateUI(); 
 
-        // --- ส่วนที่ 2: ส่งคำสั่งไปยัง Blynk ---
         const val = relayStates[id] ? 1 : 0;
-        fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
+        fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`); // ส่งค่าเบื้องหลัง
 
-        // --- ส่วนที่ 3: รอ 5 วิ เพื่อรีเฟรชยืนยันค่าจริง ---
-        startRefreshTimer();
+        resetRefreshTimer(); // ตั้งเวลารีเฟรชใหม่ทุกครั้งที่กด
     }
 
-    async function masterAction(val) {
-        // เปลี่ยนหน้าเว็บทันทีทุกดวง
+    function masterAction(val) {
         relayStates.fill(val === 1);
         updateUI();
 
         const vPin = val === 1 ? 'V8' : 'V9';
         fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
 
-        startRefreshTimer();
+        resetRefreshTimer();
     }
 
-    function startRefreshTimer() {
+    // 5. ระบบจัดการ Timer (แก้ไขจุดที่ซ้ำซ้อน)
+    function resetRefreshTimer() {
         const banner = document.getElementById('refresh-banner');
         banner.style.opacity = "1";
         
+        // ถ้ามี Timer เดิมอยู่ให้ยกเลิกก่อน (ป้องกันตัวเลขกระโดด)
+        if (refreshInterval) clearInterval(refreshInterval);
+        
         let timeLeft = 5;
-        const countdown = setInterval(() => {
-            banner.innerText = `ส่งคำสั่งแล้ว! ระบบจะรีเฟรชเพื่อความแม่นยำในอีก ${timeLeft} วินาที`;
+        banner.innerText = `รับคำสั่งแล้ว! จะรีเฟรชข้อมูลในอีก ${timeLeft} วินาที`;
+
+        refreshInterval = setInterval(() => {
             timeLeft--;
-            if (timeLeft < 0) {
-                clearInterval(countdown);
+            if (timeLeft > 0) {
+                banner.innerText = `รับคำสั่งแล้ว! จะรีเฟรชข้อมูลในอีก ${timeLeft} วินาที`;
+            } else {
+                clearInterval(refreshInterval);
+                banner.innerText = "กำลังซิงค์ข้อมูล...";
                 window.location.reload();
             }
         }, 1000);
@@ -135,15 +137,14 @@
     function updateUI() {
         relayStates.forEach((state, i) => {
             const card = document.getElementById(`card-${i}`);
-            if(state) card.classList.add('active');
-            else card.classList.remove('active');
+            if (card) state ? card.classList.add('active') : card.classList.remove('active');
         });
     }
 
     window.onload = () => {
         syncStatus();
         checkServer();
-        setInterval(checkServer, 10000); // เช็คสถานะออนไลน์ทุก 10 วิ
+        setInterval(checkServer, 15000); // เช็คสถานะทุก 15 วิ
     };
 </script>
 </body>
