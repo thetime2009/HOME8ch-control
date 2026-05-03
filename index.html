@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ปิ่นทองFactory_8ch - v1.2 (Auto-Sync)</title>
+    <title>Home_8ch - v1.3 (Real-time Sync)</title>
     <style>
         :root { 
             --bright-green: #26ff00; 
@@ -11,53 +11,50 @@
             --card-bg: #1a1a1a; 
             --offline-red: #ff3131;
         }
-        body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; }
-        .header h1 { color: var(--bright-green); text-align: center; margin-bottom: 5px; }
+        body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
         
-        /* Server Status Badge */
-        .server-badge {
-            text-align: center; margin-bottom: 25px; font-size: 0.8rem;
-            display: flex; justify-content: center; align-items: center; gap: 8px;
+        /* Server Status UI */
+        .server-status {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 8px 16px; border-radius: 20px; background: #222; margin-bottom: 20px;
         }
         .dot { width: 10px; height: 10px; border-radius: 50%; }
         .online { background: var(--bright-green); box-shadow: 0 0 10px var(--bright-green); }
         .offline { background: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
 
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 900px; margin: auto; }
-        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; text-align: center; transition: 0.3s; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
+        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; }
         .card.active { border-color: var(--bright-green); box-shadow: 0 0 15px rgba(38, 255, 0, 0.2); }
         
-        .btn-toggle { width: 60px; height: 30px; background: #333; border-radius: 20px; position: relative; cursor: pointer; margin: 15px auto 0; transition: 0.4s; }
-        .btn-toggle::before { content: ''; position: absolute; width: 22px; height: 22px; background: #fff; border-radius: 50%; top: 4px; left: 4px; transition: 0.4s; }
+        .btn-toggle { width: 60px; height: 30px; background: #333; border-radius: 20px; position: relative; cursor: pointer; margin: 15px auto 0; }
+        .btn-toggle::before { content: ''; position: absolute; width: 22px; height: 22px; background: #fff; border-radius: 50%; top: 4px; left: 4px; transition: 0.3s; }
         .active .btn-toggle { background: var(--bright-green); }
         .active .btn-toggle::before { left: 34px; }
 
-        .master-controls { display: flex; gap: 10px; max-width: 900px; margin: 30px auto; }
-        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .master-controls { display: flex; gap: 10px; max-width: 800px; margin: 30px auto; }
+        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; }
         .btn-on { background: var(--bright-green); color: #000; }
         .btn-off { background: #444; color: #fff; }
-        
-        .version-tag { font-size: 0.7rem; color: #444; text-align: center; margin-top: 30px; }
+        .version { font-size: 0.7rem; color: #444; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h1>ปิ่นทองFactory_8CH</h1>
-    <div class="server-badge">
+    <h1>HOME_8CH</h1>
+    
+    <div class="server-status">
         <div id="status-dot" class="dot offline"></div>
-        <span id="status-text">กำลังตรวจสอบสถานะบอร์ด...</span>
+        <span id="status-text" style="font-size: 0.8rem;">กำลังซิงค์...</span>
     </div>
-</div>
 
-<div class="grid" id="main-grid"></div>
+    <div class="grid" id="main-grid"></div>
 
-<div class="master-controls">
-    <button class="m-btn btn-on" onclick="masterAction(1)">ALL ON</button>
-    <button class="m-btn btn-off" onclick="masterAction(0)">ALL OFF</button>
-</div>
+    <div class="master-controls">
+        <button class="m-btn btn-on" onclick="masterAction(1)">ALL ON</button>
+        <button class="m-btn btn-off" onclick="masterAction(0)">ALL OFF</button>
+    </div>
 
-<div class="version-tag">Version 1.2 (Auto-Sync & Status) | แก้ไขระบบอัพเดท UI ทันที</div>
+    <div class="version">v1.3 Stable Sync | แก้ไขระบบอัปเดตดีเลย์</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
@@ -65,18 +62,28 @@
 
     let relayStates = new Array(8).fill(false);
 
-    // 1. สร้าง UI เริ่มต้น
+    // สร้าง UI
     const grid = document.getElementById('main-grid');
     for(let i=0; i<8; i++) {
         grid.innerHTML += `
             <div class="card" id="card-${i}">
-                <span style="font-size:0.9rem; opacity:0.8;">Relay ${i+1}</span>
+                <span>Relay ${i+1}</span>
                 <div class="btn-toggle" onclick="toggle(${i})"></div>
             </div>
         `;
     }
 
-    // 2. ฟังก์ชันดึงสถานะ (Sync)
+    // ฟังก์ชันตรวจสอบสถานะบอร์ด
+    async function checkServer() {
+        try {
+            const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
+            const isOnline = await res.json();
+            document.getElementById('status-dot').className = isOnline ? "dot online" : "dot offline";
+            document.getElementById('status-text').innerText = isOnline ? "BOARD ONLINE" : "BOARD OFFLINE";
+        } catch (e) { console.error("Server Check Error"); }
+    }
+
+    // ฟังก์ชันดึงสถานะจาก Blynk
     async function syncStatus() {
         try {
             for(let i=0; i<8; i++) {
@@ -87,67 +94,46 @@
                 }
             }
             updateUI();
-        } catch (err) { console.error("Sync Error:", err); }
+        } catch (err) { console.error("Sync Error"); }
     }
 
-    // 3. ฟังก์ชันเช็คสถานะ Server
-    async function checkServer() {
-        try {
-            const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
-            const isConnected = await res.json();
-            const dot = document.getElementById('status-dot');
-            const txt = document.getElementById('status-text');
-            
-            if(isConnected) {
-                dot.className = "dot online";
-                txt.innerText = "BOARD ONLINE";
-                txt.style.color = "var(--bright-green)";
-            } else {
-                dot.className = "dot offline";
-                txt.innerText = "BOARD OFFLINE";
-                txt.style.color = "var(--offline-red)";
-            }
-        } catch (e) { console.error("Status Check Error:", e); }
-    }
-
-    // 4. ฟังก์ชันควบคุม (ปรับปรุงให้อัปเดต UI ทันที)
+    // ฟังก์ชันควบคุมรายตัว
     async function toggle(id) {
-        // อัปเดตสถานะในหน้าเว็บก่อน (Optimistic Update)
+        // 1. เปลี่ยนสถานะบนหน้าเว็บทันที (Optimistic UI)
         relayStates[id] = !relayStates[id];
-        updateUI(); 
-        
-        // ส่งคำสั่งไปยัง Cloud
+        updateUI();
+
+        // 2. ส่งคำสั่งไป Blynk
         const val = relayStates[id] ? 1 : 0;
         await fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
-        
-        // ซิงค์ซ้ำอีกครั้งหลังจาก 500ms เพื่อความชัวร์ว่า Cloud รับทราบแล้ว
-        setTimeout(syncStatus, 500);
+
+        // 3. หน่วงเวลา 800ms แล้วซิงค์ค่าจริงกลับมาอีกครั้งเพื่อความแม่นยำ
+        setTimeout(syncStatus, 800);
     }
 
     async function masterAction(val) {
+        const vPin = val === 1 ? 'V8' : 'V9';
         relayStates.fill(val === 1);
         updateUI();
         
-        const vPin = (val === 1) ? 'V8' : 'V9';
         await fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
         
-        // รอเวลาให้คำสั่งประมวลผล แล้วซิงค์ค่าจริงกลับมา
-        setTimeout(syncStatus, 1000);
+        // Master action ใช้เวลาประมวลผลนานกว่า จึงหน่วง 1.5 วินาที
+        setTimeout(syncStatus, 1500);
     }
 
     function updateUI() {
         relayStates.forEach((state, i) => {
             const card = document.getElementById(`card-${i}`);
-            if (card) state ? card.classList.add('active') : card.classList.remove('active');
+            state ? card.classList.add('active') : card.classList.remove('active');
         });
     }
 
-    // ทำงานเมื่อโหลดหน้าเว็บ
+    // เริ่มทำงานเมื่อโหลดหน้าเว็บ
     window.onload = () => {
         syncStatus();
         checkServer();
-        // ตรวจสอบสถานะ Server ทุกๆ 10 วินาที
-        setInterval(checkServer, 10000);
+        setInterval(checkServer, 10000); // เช็คสถานะบอร์ดทุก 10 วินาที
     };
 </script>
 </body>
