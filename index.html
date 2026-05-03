@@ -3,23 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - v1.8 (Customizable Sync)</title>
+    <title>Home_8ch - v1.9 (Silent Sync)</title>
     <style>
         :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --offline-red: #ff3131; }
         body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; text-align: center; }
         
-        /* Server Status & Settings */
-        .header-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .header-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 30px; }
         .server-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; background: #222; }
         .dot { width: 10px; height: 10px; border-radius: 50%; }
         .online { background: var(--bright-green); box-shadow: 0 0 10px var(--bright-green); }
         .offline { background: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
         
         .settings-panel { font-size: 0.8rem; color: #aaa; background: #222; padding: 10px; border-radius: 12px; display: flex; gap: 10px; align-items: center; }
-        .settings-panel input { width: 40px; background: #333; border: 1px solid #444; color: var(--bright-green); text-align: center; border-radius: 4px; padding: 2px; }
+        .settings-panel input { width: 45px; background: #333; border: 1px solid #444; color: var(--bright-green); text-align: center; border-radius: 4px; padding: 4px; font-weight: bold; }
 
-        #refresh-banner { height: 25px; color: var(--bright-green); font-size: 0.8rem; margin-bottom: 10px; opacity: 0; transition: 0.3s; font-weight: bold; }
-        
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; max-width: 800px; margin: auto; }
         .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; transition: 0.3s; cursor: pointer; user-select: none; }
         .card.active { border-color: var(--bright-green); box-shadow: 0 0 15px rgba(38, 255, 0, 0.2); }
@@ -43,17 +40,14 @@
     <div class="header-controls">
         <div class="server-status">
             <div id="status-dot" class="dot offline"></div>
-            <span id="status-text" style="font-size: 0.8rem;">กำลังตรวจสอบ...</span>
+            <span id="status-text" style="font-size: 0.8rem;">กำลังซิงค์...</span>
         </div>
         
-        <!-- ส่วนตั้งค่าเวลารีเฟรช -->
         <div class="settings-panel">
-            <span>ตั้งเวลารีเฟรช (วินาที):</span>
+            <span>ตั้งเวลารีเฟรชอัตโนมัติ (วินาที):</span>
             <input type="number" id="refresh-time-input" value="3" min="1" max="60">
         </div>
     </div>
-
-    <div id="refresh-banner">อัปเดตสถานะแล้ว...</div>
 
     <div class="grid" id="main-grid"></div>
 
@@ -62,14 +56,14 @@
         <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด</button>
     </div>
 
-    <div class="version">v1.8 | Customizable Auto-Refresh (3s Default)</div>
+    <div class="version">v1.9 | Silent Background Sync & Adjustable Timer</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
     const API_BASE = "https://sgp1.blynk.cloud/external/api/";
 
     let relayStates = new Array(8).fill(false);
-    let refreshInterval = null;
+    let refreshTimeout = null;
 
     // สร้างปุ่มควบคุม 8 ช่อง
     const grid = document.getElementById('main-grid');
@@ -80,67 +74,57 @@
         </div>
     `).join('');
 
-    // เช็คสถานะการเชื่อมต่อบอร์ด
     async function checkServer() {
         try {
             const res = await fetch(`${API_BASE}isHardwareConnected?token=${TOKEN}`);
             const isOnline = await res.json();
             document.getElementById('status-dot').className = isOnline ? "dot online" : "dot offline";
             document.getElementById('status-text').innerText = isOnline ? "BOARD ONLINE" : "BOARD OFFLINE";
-        } catch (e) { console.error("Server check error"); }
+        } catch (e) { console.error("Server Status Error"); }
     }
 
-    // ซิงค์สถานะไฟจากเซิร์ฟเวอร์
     async function syncStatus() {
         try {
             const promises = relayStates.map((_, i) => fetch(`${API_BASE}get?token=${TOKEN}&V${i}`).then(r => r.text()));
             const results = await Promise.all(promises);
             relayStates = results.map(val => val.trim() === "1");
             updateUI();
-        } catch (err) { console.error("Sync failed"); }
+        } catch (err) { console.error("Initial Sync Failed"); }
     }
 
-    // ฟังก์ชันเปิด-ปิดรายช่อง
     function toggle(id) {
+        // เปลี่ยนทันทีบนหน้าจอ
         relayStates[id] = !relayStates[id];
         updateUI();
+        
+        // ส่งคำสั่งเบื้องหลัง
         const val = relayStates[id] ? 1 : 0;
         fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
-        resetRefreshTimer();
+        
+        // เริ่มต้นการรีเฟรชเงียบๆ
+        triggerSilentRefresh();
     }
 
-    // ฟังก์ชันสั่งงานรวม
     function masterAction(val) {
         relayStates.fill(val === 1);
         updateUI();
         const vPin = val === 1 ? 'V8' : 'V9';
         fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
-        resetRefreshTimer();
+        triggerSilentRefresh();
     }
 
-    // --- ส่วนที่ปรับปรุง: ระบบตั้งเวลาได้เอง ---
-    function resetRefreshTimer() {
-        const banner = document.getElementById('refresh-banner');
+    // ฟังก์ชันจัดการรีเฟรชแบบเงียบๆ ตามเวลาที่ตั้งค่าไว้
+    function triggerSilentRefresh() {
         const timeInput = document.getElementById('refresh-time-input');
+        const seconds = parseInt(timeInput.value) || 3;
         
-        // อ่านค่าจาก Input (ถ้าค่าไม่ใช่ตัวเลขให้ใช้ 3 วินาทีเป็นค่าเริ่มต้น)
-        let timeLeft = parseInt(timeInput.value) || 3;
+        // เคลียร์ Timeout เดิมถ้ามีการกดซ้ำ
+        if (refreshTimeout) clearTimeout(refreshTimeout);
         
-        banner.style.opacity = "1";
-        if (refreshInterval) clearInterval(refreshInterval);
-        
-        banner.innerText = `รับคำสั่งแล้ว! จะรีเฟรชหน้าเว็บใน ${timeLeft} วินาที`;
-
-        refreshInterval = setInterval(() => {
-            timeLeft--;
-            if (timeLeft > 0) {
-                banner.innerText = `รับคำสั่งแล้ว! จะรีเฟรชหน้าเว็บใน ${timeLeft} วินาที`;
-            } else {
-                clearInterval(refreshInterval);
-                banner.innerText = "กำลังรีเฟรช...";
-                window.location.reload();
-            }
-        }, 1000);
+        // ตั้งเวลาใหม่ (แปลงวินาทีเป็นมิลลิวินาที)
+        refreshTimeout = setTimeout(() => {
+            window.location.reload();
+        }, seconds * 1000);
     }
 
     function updateUI() {
