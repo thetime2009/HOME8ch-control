@@ -3,179 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home_8ch - Smart Sync Control</title>
+    <title>Home_8ch - v1.1 (Stable Sync)</title>
     <style>
-        :root {
-            --bright-green: #26ff00; /* สีเขียวสว่างตามโจทย์ */
-            --dark-bg: #0a0a0a;
-            --card-bg: #1a1a1a;
-            --text-gray: #888;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background-color: var(--dark-bg);
-            color: #ffffff;
-            margin: 0;
-            padding: 20px;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            color: var(--bright-green);
-            text-shadow: 0 0 20px rgba(38, 255, 0, 0.5);
-            margin: 0;
-            letter-spacing: 2px;
-        }
-
-        .status-badge {
-            font-size: 0.8rem;
-            color: var(--text-gray);
-            margin-top: 10px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            max-width: 900px;
-            margin: auto;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border-radius: 18px;
-            padding: 20px;
-            border: 1px solid #333;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        /* เมื่อ Relay เปิดอยู่ */
-        .card.active {
-            border-color: var(--bright-green);
-            box-shadow: 0 0 15px rgba(38, 255, 0, 0.2);
-        }
-
-        .relay-name {
-            font-weight: bold;
-            margin-bottom: 15px;
-            display: block;
-        }
-
-        .btn-toggle {
-            width: 70px;
-            height: 35px;
-            background: #333;
-            border-radius: 20px;
-            position: relative;
-            cursor: pointer;
-            margin: auto;
-            transition: 0.4s;
-        }
-
-        .btn-toggle::before {
-            content: '';
-            position: absolute;
-            width: 27px;
-            height: 27px;
-            background: #fff;
-            border-radius: 50%;
-            top: 4px;
-            left: 4px;
-            transition: 0.4s;
-        }
-
+        /* CSS เดิมคงไว้เพื่อความต่อเนื่องของ UI */
+        :root { --bright-green: #26ff00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; }
+        body { font-family: 'Inter', sans-serif; background: var(--dark-bg); color: #fff; padding: 20px; }
+        .header h1 { color: var(--bright-green); text-align: center; text-shadow: 0 0 20px rgba(38, 255, 0, 0.5); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; max-width: 900px; margin: auto; }
+        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; border: 1px solid #333; text-align: center; transition: 0.4s; }
+        .card.active { border-color: var(--bright-green); box-shadow: 0 0 15px rgba(38, 255, 0, 0.2); }
+        .btn-toggle { width: 70px; height: 35px; background: #333; border-radius: 20px; position: relative; cursor: pointer; margin: auto; }
+        .btn-toggle::before { content: ''; position: absolute; width: 27px; height: 27px; background: #fff; border-radius: 50%; top: 4px; left: 4px; transition: 0.4s; }
         .active .btn-toggle { background: var(--bright-green); }
         .active .btn-toggle::before { left: 39px; }
-
-        .master-controls {
-            display: flex;
-            gap: 10px;
-            max-width: 900px;
-            margin: 30px auto;
-        }
-
-        .m-btn {
-            flex: 1;
-            padding: 15px;
-            border-radius: 12px;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: 0.2s;
-        }
-
-        .btn-on { background: var(--bright-green); color: #000; }
+        .master-controls { display: flex; gap: 10px; max-width: 900px; margin: 30px auto; }
+        .m-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-on { background: var(--bright-green); }
         .btn-off { background: #444; color: #fff; }
-        .m-btn:active { transform: scale(0.95); }
-
+        .version-tag { font-size: 0.7rem; color: #555; text-align: center; margin-top: 20px; }
     </style>
 </head>
 <body>
 
 <div class="header">
     <h1>HOME_8CH</h1>
-    <div class="status-badge" id="sync-status">กำลังซิงค์สถานะ...</div>
+    <div id="sync-status" style="text-align: center; color: #888; font-size: 0.8rem;">ระบบเริ่มทำงาน...</div>
 </div>
 
-<div class="grid" id="main-grid">
-    <!-- ปุ่มจะถูกสร้างที่นี่ -->
-</div>
+<div class="grid" id="main-grid"></div>
 
 <div class="master-controls">
-    <button class="m-btn btn-on" onclick="masterAction(1)">เปิดทั้งหมด (ALL ON)</button>
-    <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด (ALL OFF)</button>
+    <button class="m-btn btn-on" onclick="masterAction(1)">เปิดทั้งหมด</button>
+    <button class="m-btn btn-off" onclick="masterAction(0)">ปิดทั้งหมด</button>
 </div>
+
+<div class="version-tag">Version 1.1 (Stable Sync) | Powered by Gemini 3 Flash</div>
 
 <script>
     const TOKEN = "qfA4LcrrzCc6bpHib_y9ZPLGla5OYdi1";
     const API_BASE = "https://sgp1.blynk.cloud/external/api/";
 
-    // เก็บสถานะจริง 8 ช่อง
     let relayStates = new Array(8).fill(false);
 
-    // 1. สร้าง UI
+    // สร้าง UI
     const grid = document.getElementById('main-grid');
+    grid.innerHTML = ""; // ล้างค่าเดิมก่อนสร้างใหม่ป้องกัน ID ซ้ำ
     for(let i=0; i<8; i++) {
         grid.innerHTML += `
             <div class="card" id="card-${i}">
-                <span class="relay-name">Relay ${i+1}</span>
+                <span style="display:block; margin-bottom:10px;">Relay ${i+1}</span>
                 <div class="btn-toggle" onclick="toggle(${i})"></div>
             </div>
         `;
     }
 
-    // 2. ฟังก์ชันดึงสถานะจาก Cloud (Sync)
+    // ฟังก์ชันซิงค์สถานะที่แก้ไขแล้ว (V1.1)
     async function syncStatus() {
-        document.getElementById('sync-status').innerText = "กำลังดึงข้อมูลจาก Cloud...";
+        const statusEl = document.getElementById('sync-status');
+        statusEl.innerText = "กำลังซิงค์สถานะจาก Cloud...";
+        
         try {
+            // ดึงข้อมูลทีละขาแบบลำดับเพื่อความแม่นยำ
             for(let i=0; i<8; i++) {
-                const res = await fetch(`${API_BASE}get?token=${TOKEN}&V${i}`);
-                const val = await res.text();
-                relayStates[i] = (val == "1");
+                const response = await fetch(`${API_BASE}get?token=${TOKEN}&V${i}`);
+                if (response.ok) {
+                    const val = await response.text();
+                    // ตรวจสอบค่าอย่างเข้มงวด: ต้องเป็น "1" เท่านั้นถึงจะ On
+                    // ป้องกันกรณี API ส่งค่าว่าง หรือข้อความ Error กลับมาแล้ว JavaScript ตีความว่าเป็น True
+                    relayStates[i] = (val.trim() === "1");
+                }
             }
             updateUI();
-            document.getElementById('sync-status').innerText = "สถานะปัจจุบันอัปเดตแล้ว";
+            statusEl.innerText = "ซิงค์สถานะสำเร็จ";
         } catch (err) {
-            document.getElementById('sync-status').innerText = "ซิงค์ไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ";
+            statusEl.innerText = "การซิงค์ล้มเหลว ตรวจสอบการเชื่อมต่อ";
+            console.error(err);
         }
     }
 
-    // 3. ฟังก์ชันควบคุมรายตัว
     async function toggle(id) {
         relayStates[id] = !relayStates[id];
-        const val = relayStates[id] ? 1 : 0;
         updateUI();
+        const val = relayStates[id] ? 1 : 0;
         await fetch(`${API_BASE}update?token=${TOKEN}&V${id}=${val}`);
     }
 
-    // 4. ฟังก์ชัน Master
     async function masterAction(val) {
         const vPin = (val === 1) ? 'V8' : 'V9';
         relayStates.fill(val === 1);
@@ -183,17 +95,16 @@
         await fetch(`${API_BASE}update?token=${TOKEN}&${vPin}=1`);
     }
 
-    // 5. อัปเดตการแสดงผลบนเว็บ
     function updateUI() {
         relayStates.forEach((state, i) => {
             const card = document.getElementById(`card-${i}`);
-            state ? card.classList.add('active') : card.classList.remove('active');
+            if (card) {
+                state ? card.classList.add('active') : card.classList.remove('active');
+            }
         });
     }
 
-    // เริ่มต้นดึงข้อมูลเมื่อโหลดหน้าเว็บ
     window.onload = syncStatus;
-
 </script>
 </body>
 </html>
